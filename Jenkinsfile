@@ -8,6 +8,7 @@ pipeline {
     }
 
     stages {
+
         stage('Checkout') {
             steps {
                 checkout scm
@@ -37,19 +38,20 @@ pipeline {
             }
         }
 
-         stage('SonarQube Analysis') {
-    steps {
-        withSonarQubeEnv('SonarQube') {
-            withSonarQubeScannerEnv('SonarScanner') {
-                sh '''
-                    sonar-scanner \
-                      -Dsonar.projectKey=nodejs-cicd-demo \
-                      -Dsonar.sources=app.js \
-                      -Dsonar.tests=test \
-                      -Dsonar.test.inclusions=test/**/*.js
-                '''
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    withSonarQubeScannerEnv('SonarScanner') {
+                        sh '''
+                            sonar-scanner \
+                              -Dsonar.projectKey=nodejs-cicd-demo \
+                              -Dsonar.sources=app.js \
+                              -Dsonar.tests=test \
+                              -Dsonar.test.inclusions=test/**/*.js
+                        '''
+                    }
+                }
             }
         }
     }
 }
-                          
