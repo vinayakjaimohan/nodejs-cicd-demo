@@ -57,13 +57,48 @@ pipeline {
                 }
             }
         }
-stage('SonarQube Quality Gate') {
-    steps {
-        timeout(time: 5, unit: 'MINUTES') {
-            waitForQualityGate abortPipeline: true
+
+        stage('SonarQube Quality Gate') {
+            steps {
+                script {
+                    withCredentials([string(
+                        credentialsId: 'sonarqube-token',
+                        variable: 'SONAR_TOKEN'
+                    )]) {
+
+                        timeout(time: 5, unit: 'MINUTES') {
+                            waitUntil {
+                                def result = sh(
+                                    script: '''
+                                        curl -s -u "$SONAR_TOKEN:" \
+                                        "http://172.31.23.180:9000/api/ce/component?component=nodejs-cicd-demo"
+                                    ''',
+                                    returnStdout: true
+                                ).trim()
+
+                                echo "SonarQube task status: ${result}"
+
+                                return result.contains('"status":"SUCCESS"') ||
+                                       result.contains('"status":"FAILED"')
+                            }
+                        }
+
+                        def gate = sh(
+                            script: '''
+                                curl -s -u "$SONAR_TOKEN:" \
+                                "http://172.31.23.180:9000/api/qualitygates/project_status?projectKey=nodejs-cicd-demo"
+                            ''',
+                            returnStdout: true
+                        ).trim()
+
+                        echo "SonarQube Quality Gate: ${gate}"
+
+                        if (!gate.contains('"status":"OK"')) {
+                            error "SonarQube Quality Gate failed"
+                        }
+                    }
+                }
+            }
         }
     }
 }
-
-    }
-}          
