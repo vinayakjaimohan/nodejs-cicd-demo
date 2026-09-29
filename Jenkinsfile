@@ -38,3 +38,16 @@ pipeline {
         }
     }
 }
+stage('SonarQube Analysis') {
+    steps {
+        withSonarQubeEnv('SonarQube') {
+            sh '''
+                sonar-scanner \
+                  -Dsonar.projectKey=nodejs-cicd-demo \
+                  -Dsonar.sources=app.js \
+                  -Dsonar.tests=test \
+                  -Dsonar.test.inclusions=test/**/*.js
+            '''
+        }
+    }
+}
