@@ -21,10 +21,15 @@ pipeline {
         }
 
         stage('Build') {
-            steps {
-                sh 'npm pack'
-            }
-        }
+    steps {
+        sh '''
+            VERSION=$(node -p "require('./package.json').version")
+            ARTIFACT_VERSION="${VERSION}-feature.${BUILD_NUMBER}"
+            npm version "$ARTIFACT_VERSION" --no-git-tag-version
+            npm pack
+        '''
+    }
+}
 
         stage('Test') {
             steps {
