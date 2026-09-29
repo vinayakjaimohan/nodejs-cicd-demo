@@ -100,5 +100,34 @@ pipeline {
                 }
             }
         }
+
+      stage('Push Artifact to Nexus') {
+       steps {
+        script {
+            def artifact = sh(
+                script: 'ls *.tgz | head -n 1',
+                returnStdout: true
+            ).trim()
+
+            nexusArtifactUploader(
+                nexusVersion: 'nexus3',
+                protocol: 'http',
+                nexusUrl: '172.31.16.167:8081',
+                groupId: 'com.example',
+                version: "${BUILD_NUMBER}",
+                repository: 'npm-releases',
+                credentialsId: 'nexus-jenkins',
+                artifacts: [
+                    [
+                        artifactId: 'nodejs-cicd-demo',
+                        classifier: '',
+                        file: artifact,
+                        type: 'tgz'
+                    ]
+                ]
+            )
+          }
+       }
+      }
     }
 }
