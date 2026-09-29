@@ -26,7 +26,9 @@ pipeline {
                 sh '''
                     VERSION=$(node -p "require('./package.json').version")
                     ARTIFACT_VERSION="${VERSION}-feature.${BUILD_NUMBER}"
+
                     npm version "$ARTIFACT_VERSION" --no-git-tag-version
+
                     npm pack
                 '''
             }
@@ -40,15 +42,17 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('SonarQube') {
-                    withSonarQubeScannerEnv('SonarScanner') {
-                        sh '''
-                            sonar-scanner \
+                script {
+                    def scannerHome = tool 'SonarScanner'
+
+                    withSonarQubeEnv('SonarQube') {
+                        sh """
+                            ${scannerHome}/bin/sonar-scanner \
                               -Dsonar.projectKey=nodejs-cicd-demo \
                               -Dsonar.sources=app.js \
                               -Dsonar.tests=test \
                               -Dsonar.test.inclusions=test/**/*.js
-                        '''
+                        """
                     }
                 }
             }
