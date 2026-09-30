@@ -107,7 +107,7 @@ pipeline {
                                   --max-time 60 \
                                   -u "$NEXUS_USER:$NEXUS_PASSWORD" \
                                   --upload-file "$NEXUS_ARTIFACT" \
-                                  "http://172.31.16.167:8081/repository/raw-release/$(basename "$NEXUS_ARTIFACT")"
+                                  "http://44.222.201.199:8081/repository/raw-release/$(basename "$NEXUS_ARTIFACT")"
 
                                 echo "Nexus upload successful."
                             '''
@@ -148,7 +148,7 @@ pipeline {
                                   --max-time 60 \
                                   -u "$NEXUS_USER:$NEXUS_PASSWORD" \
                                   --upload-file "$NEXUS_ARTIFACT" \
-                                  "http://172.31.16.167:8081/repository/raw-release/$(basename "$NEXUS_ARTIFACT")"
+                                  "http://44.222.201.199:8081/repository/raw-release/$(basename "$NEXUS_ARTIFACT")"
 
                                 echo "Nexus upload successful."
                             '''
