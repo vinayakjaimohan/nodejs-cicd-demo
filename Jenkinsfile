@@ -98,12 +98,7 @@ pipeline {
                         )
                     ]) {
                         sh """
-                            curl --fail \
-                              --connect-timeout 10 \
-                              --max-time 60 \
-                              -u "\$NEXUS_USER:\$NEXUS_PASSWORD" \
-                              --upload-file "${artifact}" \
-                              "http://172.31.16.167:8081/repository/raw-release/${artifact}"
+                            "\$HOME/upload-to-nexus.sh" "${artifact}"
                         """
                     }
                 }
@@ -132,12 +127,7 @@ pipeline {
                         )
                     ]) {
                         sh """
-                            curl --fail \
-                              --connect-timeout 10 \
-                              --max-time 60 \
-                              -u "\$NEXUS_USER:\$NEXUS_PASSWORD" \
-                              --upload-file "${artifact}" \
-                              "http://172.31.16.167:8081/repository/raw-release/${artifact}"
+                            "\$HOME/upload-to-nexus.sh" "${artifact}"
                         """
                     }
                 }
