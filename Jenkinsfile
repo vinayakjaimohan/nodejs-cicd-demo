@@ -173,7 +173,7 @@ pipeline {
                             curl -f \
                               -u "\$NEXUS_USER:\$NEXUS_PASSWORD" \
                               --upload-file "${artifact}" \
-                              "http://172.31.16.167:8081/repository/raw-release/${artifact}"
+                              "http://44.222.201.199:8081/repository/raw-release/${artifact}"
                         """
                     }
                 }
@@ -205,7 +205,7 @@ pipeline {
                             curl -f \
                               -u "\$NEXUS_USER:\$NEXUS_PASSWORD" \
                               --upload-file "${artifact}" \
-                              "http://172.31.16.167:8081/repository/raw-release/${artifact}"
+                              "http://44.222.201.199:8081/repository/raw-release/${artifact}"
                         """
                     }
                 }
