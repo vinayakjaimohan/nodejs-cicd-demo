@@ -65,7 +65,28 @@ pipeline {
                 }
             }
         }
+stage('Test SonarQube Credential') {
+    steps {
+        withCredentials([
+            string(
+                credentialsId: 'sonarqube-token',
+                variable: 'SONAR_TOKEN'
+            )
+        ]) {
+            sh '''
+                HTTP_STATUS=$(curl -s \
+                    -o /dev/null \
+                    -w "%{http_code}" \
+                    -u "$SONAR_TOKEN:" \
+                    "http://172.31.23.180:9000/api/authentication/validate")
 
+                echo "SonarQube authentication status: $HTTP_STATUS"
+
+                test "$HTTP_STATUS" = "200"
+            '''
+        }
+    }
+}
         stage('SonarQube Quality Gate') {
             steps {
                 script {
