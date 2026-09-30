@@ -88,31 +88,30 @@ pipeline {
                         returnStdout: true
                     ).trim()
 
-                    def version = sh(
-                        script: 'node -p "require(\'./package.json\').version"',
-                        returnStdout: true
-                    ).trim()
-
                     echo "Uploading feature artifact: ${artifact}"
-                    echo "Artifact version: ${version}"
 
-                    nexusArtifactUploader(
-                        nexusVersion: 'nexus3',
-                        protocol: 'http',
-                        nexusUrl: '172.31.16.167:8081',
-                        groupId: 'nodejs-cicd-demo',
-                        version: version,
-                        repository: 'raw-release',
-                        credentialsId: 'nexus-jenkins',
-                        artifacts: [
-                            [
-                                artifactId: 'nodejs-cicd-demo',
-                                classifier: '',
-                                file: artifact,
-                                type: 'tgz'
-                            ]
-                        ]
-                    )
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: 'nexus-jenkins',
+                            usernameVariable: 'NEXUS_USER',
+                            passwordVariable: 'NEXUS_PASSWORD'
+                        )
+                    ]) {
+                        withEnv(["NEXUS_ARTIFACT=${artifact}"]) {
+                            sh '''
+                                echo "Uploading: $NEXUS_ARTIFACT"
+
+                                curl --fail --silent --show-error \
+                                  --connect-timeout 10 \
+                                  --max-time 60 \
+                                  -u "$NEXUS_USER:$NEXUS_PASSWORD" \
+                                  --upload-file "$NEXUS_ARTIFACT" \
+                                  "http://172.31.16.167:8081/repository/raw-release/$(basename "$NEXUS_ARTIFACT")"
+
+                                echo "Nexus upload successful."
+                            '''
+                        }
+                    }
                 }
             }
         }
@@ -129,31 +128,30 @@ pipeline {
                         returnStdout: true
                     ).trim()
 
-                    def version = sh(
-                        script: 'node -p "require(\'./package.json\').version"',
-                        returnStdout: true
-                    ).trim()
-
                     echo "Uploading release artifact: ${artifact}"
-                    echo "Artifact version: ${version}"
 
-                    nexusArtifactUploader(
-                        nexusVersion: 'nexus3',
-                        protocol: 'http',
-                        nexusUrl: '172.31.16.167:8081',
-                        groupId: 'nodejs-cicd-demo',
-                        version: version,
-                        repository: 'raw-release',
-                        credentialsId: 'nexus-jenkins',
-                        artifacts: [
-                            [
-                                artifactId: 'nodejs-cicd-demo',
-                                classifier: '',
-                                file: artifact,
-                                type: 'tgz'
-                            ]
-                        ]
-                    )
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: 'nexus-jenkins',
+                            usernameVariable: 'NEXUS_USER',
+                            passwordVariable: 'NEXUS_PASSWORD'
+                        )
+                    ]) {
+                        withEnv(["NEXUS_ARTIFACT=${artifact}"]) {
+                            sh '''
+                                echo "Uploading: $NEXUS_ARTIFACT"
+
+                                curl --fail --silent --show-error \
+                                  --connect-timeout 10 \
+                                  --max-time 60 \
+                                  -u "$NEXUS_USER:$NEXUS_PASSWORD" \
+                                  --upload-file "$NEXUS_ARTIFACT" \
+                                  "http://172.31.16.167:8081/repository/raw-release/$(basename "$NEXUS_ARTIFACT")"
+
+                                echo "Nexus upload successful."
+                            '''
+                        }
+                    }
                 }
             }
         }
