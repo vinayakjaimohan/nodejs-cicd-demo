@@ -80,6 +80,7 @@ pipeline {
                     env.BRANCH_NAME.startsWith('feature/')
                 }
             }
+
             steps {
                 script {
                     def artifact = sh(
@@ -96,14 +97,14 @@ pipeline {
                             passwordVariable: 'NEXUS_PASSWORD'
                         )
                     ]) {
-                        sh '''
+                        sh """
                             curl --fail \
                               --connect-timeout 10 \
                               --max-time 60 \
-                              -u "$NEXUS_USER:$NEXUS_PASSWORD" \
-                              --upload-file "$artifact" \
-                              "http://172.31.16.167:8081/repository/raw-release/$artifact"
-                        '''
+                              -u "\$NEXUS_USER:\$NEXUS_PASSWORD" \
+                              --upload-file "${artifact}" \
+                              "http://172.31.16.167:8081/repository/raw-release/${artifact}"
+                        """
                     }
                 }
             }
@@ -113,6 +114,7 @@ pipeline {
             when {
                 branch 'main'
             }
+
             steps {
                 script {
                     def artifact = sh(
@@ -129,14 +131,14 @@ pipeline {
                             passwordVariable: 'NEXUS_PASSWORD'
                         )
                     ]) {
-                        sh '''
+                        sh """
                             curl --fail \
                               --connect-timeout 10 \
                               --max-time 60 \
-                              -u "$NEXUS_USER:$NEXUS_PASSWORD" \
-                              --upload-file "$artifact" \
-                              "http://172.31.16.167:8081/repository/raw-release/$artifact"
-                        '''
+                              -u "\$NEXUS_USER:\$NEXUS_PASSWORD" \
+                              --upload-file "${artifact}" \
+                              "http://172.31.16.167:8081/repository/raw-release/${artifact}"
+                        """
                     }
                 }
             }
@@ -146,6 +148,7 @@ pipeline {
             when {
                 branch 'main'
             }
+
             steps {
                 script {
                     def artifact = sh(
@@ -167,6 +170,7 @@ pipeline {
             when {
                 branch 'main'
             }
+
             steps {
                 sh '''
                     sleep 3
