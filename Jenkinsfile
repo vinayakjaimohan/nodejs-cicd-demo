@@ -29,15 +29,14 @@ pipeline {
                     VERSION=$(node -p "require('./package.json').version")
 
                     if [ "$BRANCH_NAME" = "main" ]; then
-                       ARTIFACT_VERSION="${VERSION}-release.${BUILD_NUMBER}"
+                        ARTIFACT_VERSION="${VERSION}-release.${BUILD_NUMBER}"
                     else
-                       ARTIFACT_VERSION="${VERSION}-feature.${BUILD_NUMBER}"
+                        ARTIFACT_VERSION="${VERSION}-feature.${BUILD_NUMBER}"
                     fi
 
                     echo "Artifact version: $ARTIFACT_VERSION"
 
                     npm version "$ARTIFACT_VERSION" --no-git-tag-version
-
                     npm pack
                 '''
             }
@@ -94,7 +93,7 @@ pipeline {
                                 def status = sh(
                                     script: """
                                         curl -fsS \
-                                          -u "\$SONAR_TOKEN:" \
+                                          -u "\\$SONAR_TOKEN:" \
                                           "http://172.31.23.180:9000/api/ce/task?id=${ceTaskId}" |
                                         node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).task.status"
                                     """,
@@ -108,7 +107,7 @@ pipeline {
                                     analysisId = sh(
                                         script: """
                                             curl -fsS \
-                                              -u "\$SONAR_TOKEN:" \
+                                              -u "\\$SONAR_TOKEN:" \
                                               "http://172.31.23.180:9000/api/ce/task?id=${ceTaskId}" |
                                             node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).task.analysisId"
                                         """,
@@ -128,7 +127,7 @@ pipeline {
                             def gateStatus = sh(
                                 script: """
                                     curl -fsS \
-                                      -u "\$SONAR_TOKEN:" \
+                                      -u "\\$SONAR_TOKEN:" \
                                       "http://172.31.23.180:9000/api/qualitygates/project_status?analysisId=${analysisId}" |
                                     node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).projectStatus.status"
                                 """,
@@ -170,8 +169,14 @@ pipeline {
                         )
                     ]) {
                         sh """
-                            curl -f \
-                              -u "\$NEXUS_USER:\$NEXUS_PASSWORD" \
+                            curl --fail \
+                              --http1.1 \
+                              --connect-timeout 10 \
+                              --max-time 180 \
+                              --retry 5 \
+                              --retry-delay 5 \
+                              --retry-all-errors \
+                              -u "\\$NEXUS_USER:\\$NEXUS_PASSWORD" \
                               --upload-file "${artifact}" \
                               "http://172.31.16.167:8081/repository/raw-release/${artifact}"
                         """
@@ -202,8 +207,14 @@ pipeline {
                         )
                     ]) {
                         sh """
-                            curl -f \
-                              -u "\$NEXUS_USER:\$NEXUS_PASSWORD" \
+                            curl --fail \
+                              --http1.1 \
+                              --connect-timeout 10 \
+                              --max-time 180 \
+                              --retry 5 \
+                              --retry-delay 5 \
+                              --retry-all-errors \
+                              -u "\\$NEXUS_USER:\\$NEXUS_PASSWORD" \
                               --upload-file "${artifact}" \
                               "http://172.31.16.167:8081/repository/raw-release/${artifact}"
                         """
@@ -227,8 +238,8 @@ pipeline {
                     echo "Deploying artifact: ${artifact}"
 
                     sh """
-                        cp "${artifact}" "\$HOME/nodejs-app/"
-                        "\$HOME/deploy-app.sh" "\$HOME/nodejs-app/${artifact}"
+                        cp "${artifact}" "\\$HOME/nodejs-app/"
+                        "\\$HOME/deploy-app.sh" "\\$HOME/nodejs-app/${artifact}"
                     """
                 }
             }
