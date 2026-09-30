@@ -97,9 +97,20 @@ pipeline {
                             passwordVariable: 'NEXUS_PASSWORD'
                         )
                     ]) {
-                        sh """
-                            "\$HOME/upload-to-nexus.sh" "${artifact}"
-                        """
+                        withEnv(["NEXUS_ARTIFACT=${artifact}"]) {
+                            sh '''
+                                echo "Uploading: $NEXUS_ARTIFACT"
+
+                                curl --fail \
+                                  --connect-timeout 10 \
+                                  --max-time 60 \
+                                  -u "$NEXUS_USER:$NEXUS_PASSWORD" \
+                                  --upload-file "$NEXUS_ARTIFACT" \
+                                  "http://172.31.16.167:8081/repository/raw-release/$(basename "$NEXUS_ARTIFACT")"
+
+                                echo "Nexus upload successful."
+                            '''
+                        }
                     }
                 }
             }
@@ -126,9 +137,20 @@ pipeline {
                             passwordVariable: 'NEXUS_PASSWORD'
                         )
                     ]) {
-                        sh """
-                            "\$HOME/upload-to-nexus.sh" "${artifact}"
-                        """
+                        withEnv(["NEXUS_ARTIFACT=${artifact}"]) {
+                            sh '''
+                                echo "Uploading: $NEXUS_ARTIFACT"
+
+                                curl --fail \
+                                  --connect-timeout 10 \
+                                  --max-time 60 \
+                                  -u "$NEXUS_USER:$NEXUS_PASSWORD" \
+                                  --upload-file "$NEXUS_ARTIFACT" \
+                                  "http://172.31.16.167:8081/repository/raw-release/$(basename "$NEXUS_ARTIFACT")"
+
+                                echo "Nexus upload successful."
+                            '''
+                        }
                     }
                 }
             }
