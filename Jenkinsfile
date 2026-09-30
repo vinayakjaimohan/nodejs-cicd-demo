@@ -102,6 +102,7 @@ pipeline {
                                 echo "Uploading: $NEXUS_ARTIFACT"
 
                                 curl --fail \
+                                  --noproxy '*' \
                                   --connect-timeout 10 \
                                   --max-time 60 \
                                   -u "$NEXUS_USER:$NEXUS_PASSWORD" \
@@ -142,6 +143,7 @@ pipeline {
                                 echo "Uploading: $NEXUS_ARTIFACT"
 
                                 curl --fail \
+                                  --noproxy '*' \
                                   --connect-timeout 10 \
                                   --max-time 60 \
                                   -u "$NEXUS_USER:$NEXUS_PASSWORD" \
