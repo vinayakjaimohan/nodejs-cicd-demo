@@ -29,16 +29,17 @@ pipeline {
                     VERSION=$(node -p "require('./package.json').version")
 
                     if [ "$BRANCH_NAME" = "main" ]; then
-                        ARTIFACT_VERSION="$VERSION"
+                        ARTIFACT_VERSION="${VERSION}-release.${BUILD_NUMBER}"
                     else
                         ARTIFACT_VERSION="${VERSION}-feature.${BUILD_NUMBER}"
                     fi
 
                     echo "Artifact version: $ARTIFACT_VERSION"
 
-                    npm version "$ARTIFACT_VERSION" --no-git-tag-version
-
                     npm pack
+
+                    mv "nodejs-cicd-demo-${VERSION}.tgz" \
+                       "nodejs-cicd-demo-${ARTIFACT_VERSION}.tgz"
                 '''
             }
         }
