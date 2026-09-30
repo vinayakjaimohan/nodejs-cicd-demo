@@ -66,22 +66,20 @@ pipeline {
             }
         }
 
-         
-
-stage('SonarQube Quality Gate') {
-    steps {
-        timeout(time: 5, unit: 'MINUTES') {
-            waitForQualityGate abortPipeline: true
+        stage('SonarQube Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
         }
-    }
-}
+
         stage('Push Feature Artifact to Nexus') {
             when {
                 expression {
                     env.BRANCH_NAME.startsWith('feature/')
                 }
             }
-
             steps {
                 script {
                     def artifact = sh(
@@ -98,18 +96,14 @@ stage('SonarQube Quality Gate') {
                             passwordVariable: 'NEXUS_PASSWORD'
                         )
                     ]) {
-                        sh """
+                        sh '''
                             curl --fail \
-                              --http1.1 \
                               --connect-timeout 10 \
-                              --max-time 180 \
-                              --retry 5 \
-                              --retry-delay 5 \
-                              --retry-all-errors \
-                              -u "\\$NEXUS_USER:\\$NEXUS_PASSWORD" \
-                              --upload-file "${artifact}" \
-                              "http://172.31.16.167:8081/repository/raw-release/${artifact}"
-                        """
+                              --max-time 60 \
+                              -u "$NEXUS_USER:$NEXUS_PASSWORD" \
+                              --upload-file "$artifact" \
+                              "http://172.31.16.167:8081/repository/raw-release/$artifact"
+                        '''
                     }
                 }
             }
@@ -119,7 +113,6 @@ stage('SonarQube Quality Gate') {
             when {
                 branch 'main'
             }
-
             steps {
                 script {
                     def artifact = sh(
@@ -136,18 +129,14 @@ stage('SonarQube Quality Gate') {
                             passwordVariable: 'NEXUS_PASSWORD'
                         )
                     ]) {
-                        sh """
+                        sh '''
                             curl --fail \
-                              --http1.1 \
                               --connect-timeout 10 \
-                              --max-time 180 \
-                              --retry 5 \
-                              --retry-delay 5 \
-                              --retry-all-errors \
-                              -u "\\$NEXUS_USER:\\$NEXUS_PASSWORD" \
-                              --upload-file "${artifact}" \
-                              "http://172.31.16.167:8081/repository/raw-release/${artifact}"
-                        """
+                              --max-time 60 \
+                              -u "$NEXUS_USER:$NEXUS_PASSWORD" \
+                              --upload-file "$artifact" \
+                              "http://172.31.16.167:8081/repository/raw-release/$artifact"
+                        '''
                     }
                 }
             }
@@ -157,7 +146,6 @@ stage('SonarQube Quality Gate') {
             when {
                 branch 'main'
             }
-
             steps {
                 script {
                     def artifact = sh(
@@ -168,8 +156,8 @@ stage('SonarQube Quality Gate') {
                     echo "Deploying artifact: ${artifact}"
 
                     sh """
-                        cp "${artifact}" "\\$HOME/nodejs-app/"
-                        "\\$HOME/deploy-app.sh" "\\$HOME/nodejs-app/${artifact}"
+                        cp "${artifact}" "\$HOME/nodejs-app/"
+                        "\$HOME/deploy-app.sh" "\$HOME/nodejs-app/${artifact}"
                     """
                 }
             }
@@ -179,7 +167,6 @@ stage('SonarQube Quality Gate') {
             when {
                 branch 'main'
             }
-
             steps {
                 sh '''
                     sleep 3
