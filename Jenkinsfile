@@ -17,7 +17,9 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                sh 'npm ci'
+                sh '''
+                    npm ci
+                '''
             }
         }
 
@@ -40,30 +42,30 @@ pipeline {
 
                     mv "nodejs-cicd-demo-${VERSION}.tgz" \
                        "nodejs-cicd-demo-${ARTIFACT_VERSION}.tgz"
+
+                    ls -lh nodejs-cicd-demo-*.tgz
                 '''
             }
         }
 
         stage('Test') {
             steps {
-                sh 'npm test'
+                sh '''
+                    npm test
+                '''
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                script {
-                    def scannerHome = tool 'SonarScanner'
-
-                    withSonarQubeEnv('SonarQube') {
-                        sh """
-                            ${scannerHome}/bin/sonar-scanner \
-                              -Dsonar.projectKey=nodejs-cicd-demo \
-                              -Dsonar.sources=app.js \
-                              -Dsonar.tests=test \
-                              -Dsonar.test.inclusions=test/**/*.js
-                        """
-                    }
+                withSonarQubeEnv('SonarQube') {
+                    sh '''
+                        sonar-scanner \
+                          -Dsonar.projectKey=nodejs-cicd-demo \
+                          -Dsonar.sources=app.js \
+                          -Dsonar.tests=test \
+                          -Dsonar.test.inclusions=test/**/*.js
+                    '''
                 }
             }
         }
@@ -71,33 +73,39 @@ pipeline {
         stage('SonarQube Quality Gate') {
             steps {
                 script {
+                    def ceTaskId = sh(
+                        script: "grep '^ceTaskId=' .scannerwork/report-task.txt | cut -d= -f2",
+                        returnStdout: true
+                    ).trim()
+
+                    echo "SonarQube CE Task ID: ${ceTaskId}"
+
                     withCredentials([
                         string(
                             credentialsId: 'sonarqube-token',
                             variable: 'SONAR_TOKEN'
                         )
                     ]) {
+
+                        def analysisId = ''
+
                         timeout(time: 5, unit: 'MINUTES') {
+                            waitUntil {
+                                def response = sh(
+                                    script: """
+                                        curl -s \
+                                          -u "\$SONAR_TOKEN:" \
+                                          "http://172.31.23.180:9000/api/ce/task?id=${ceTaskId}"
+                                    """,
+                                    returnStdout: true
+                                ).trim()
 
-                            def ceTaskId = sh(
-                                script: '''
-                                    awk -F= '/^ceTaskId=/{print $2}' .scannerwork/report-task.txt
-                                ''',
-                                returnStdout: true
-                            ).trim()
-
-                            echo "SonarQube CE task: ${ceTaskId}"
-
-                            def analysisId = ''
-
-                            while (true) {
+                                echo "SonarQube CE response: ${response}"
 
                                 def status = sh(
                                     script: """
-                                        curl -fsS \
-                                          -u "\$SONAR_TOKEN:" \
-                                          "http://172.31.23.180:9000/api/ce/task?id=${ceTaskId}" |
-                                        node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).task.status"
+                                        echo '${response}' | \
+                                        python3 -c "import sys,json; print(json.load(sys.stdin)['task']['status'])"
                                     """,
                                     returnStdout: true
                                 ).trim()
@@ -105,52 +113,61 @@ pipeline {
                                 echo "SonarQube task status: ${status}"
 
                                 if (status == 'SUCCESS') {
-
                                     analysisId = sh(
                                         script: """
-                                            curl -fsS \
-                                              -u "\$SONAR_TOKEN:" \
-                                              "http://172.31.23.180:9000/api/ce/task?id=${ceTaskId}" |
-                                            node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).task.analysisId"
+                                            echo '${response}' | \
+                                            python3 -c "import sys,json; print(json.load(sys.stdin)['task']['analysisId'])"
                                         """,
                                         returnStdout: true
                                     ).trim()
 
-                                    break
+                                    return true
                                 }
 
-                                if (status == 'FAILED' || status == 'CANCELED') {
-                                    error "SonarQube Compute Engine task ${status}"
+                                if (status in ['FAILED', 'CANCELED']) {
+                                    error("SonarQube analysis failed with status: ${status}")
                                 }
 
                                 sleep 5
+                                return false
                             }
+                        }
 
-                            def gateStatus = sh(
-                                script: """
-                                    curl -fsS \
-                                      -u "\$SONAR_TOKEN:" \
-                                      "http://172.31.23.180:9000/api/qualitygates/project_status?analysisId=${analysisId}" |
-                                    node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).projectStatus.status"
-                                """,
-                                returnStdout: true
-                            ).trim()
+                        echo "SonarQube Analysis ID: ${analysisId}"
 
-                            echo "SonarQube Quality Gate: ${gateStatus}"
+                        def qualityGate = sh(
+                            script: """
+                                curl -s \
+                                  -u "\$SONAR_TOKEN:" \
+                                  "http://172.31.23.180:9000/api/qualitygates/project_status?analysisId=${analysisId}"
+                            """,
+                            returnStdout: true
+                        ).trim()
 
-                            if (gateStatus != 'OK') {
-                                error "SonarQube Quality Gate failed: ${gateStatus}"
-                            }
+                        echo "SonarQube Quality Gate response: ${qualityGate}"
+
+                        def gateStatus = sh(
+                            script: """
+                                echo '${qualityGate}' | \
+                                python3 -c "import sys,json; print(json.load(sys.stdin)['projectStatus']['status'])"
+                            """,
+                            returnStdout: true
+                        ).trim()
+
+                        echo "SonarQube Quality Gate status: ${gateStatus}"
+
+                        if (gateStatus != 'OK') {
+                            error("SonarQube Quality Gate failed: ${gateStatus}")
                         }
                     }
                 }
             }
         }
 
-        stage('Push Feature Artifact to Nexus') {
+        stage('Push Artifact to Nexus') {
             when {
-                expression {
-                    env.BRANCH_NAME.startsWith('feature/')
+                not {
+                    branch 'main'
                 }
             }
 
@@ -171,7 +188,11 @@ pipeline {
                         )
                     ]) {
                         sh """
-                            curl -f \
+                            curl --noproxy '*' \
+                              --fail \
+                              --show-error \
+                              --connect-timeout 10 \
+                              --max-time 120 \
                               -u "\$NEXUS_USER:\$NEXUS_PASSWORD" \
                               --upload-file "${artifact}" \
                               "http://172.31.16.167:8081/repository/raw-release/${artifact}"
@@ -203,7 +224,11 @@ pipeline {
                         )
                     ]) {
                         sh """
-                            curl -f \
+                            curl --noproxy '*' \
+                              --fail \
+                              --show-error \
+                              --connect-timeout 10 \
+                              --max-time 120 \
                               -u "\$NEXUS_USER:\$NEXUS_PASSWORD" \
                               --upload-file "${artifact}" \
                               "http://172.31.16.167:8081/repository/raw-release/${artifact}"
