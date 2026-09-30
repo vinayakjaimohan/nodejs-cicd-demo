@@ -65,107 +65,16 @@ pipeline {
                 }
             }
         }
-stage('Test SonarQube Credential') {
+
+         
+
+stage('SonarQube Quality Gate') {
     steps {
-        withCredentials([
-            string(
-                credentialsId: 'sonarqube-token',
-                variable: 'SONAR_TOKEN'
-            )
-        ]) {
-            sh '''
-                HTTP_STATUS=$(curl -s \
-                    -o /dev/null \
-                    -w "%{http_code}" \
-                    -u "$SONAR_TOKEN:" \
-                    "http://172.31.23.180:9000/api/authentication/validate")
-
-                echo "SonarQube authentication status: $HTTP_STATUS"
-
-                test "$HTTP_STATUS" = "200"
-            '''
+        timeout(time: 5, unit: 'MINUTES') {
+            waitForQualityGate abortPipeline: true
         }
     }
 }
-        stage('SonarQube Quality Gate') {
-            steps {
-                script {
-                    withCredentials([
-                        string(
-                            credentialsId: 'sonarqube-token',
-                            variable: 'SONAR_TOKEN'
-                        )
-                    ]) {
-                        timeout(time: 5, unit: 'MINUTES') {
-
-                            def ceTaskId = sh(
-                                script: '''
-                                    awk -F= '/^ceTaskId=/{print $2}' .scannerwork/report-task.txt
-                                ''',
-                                returnStdout: true
-                            ).trim()
-
-                            echo "SonarQube CE task: ${ceTaskId}"
-
-                            def analysisId = ''
-
-                            while (true) {
-
-                                def status = sh(
-                                    script: """
-                                        curl -fsS \
-                                          -u "\\$SONAR_TOKEN:" \
-                                          "http://172.31.23.180:9000/api/ce/task?id=${ceTaskId}" |
-                                        node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).task.status"
-                                    """,
-                                    returnStdout: true
-                                ).trim()
-
-                                echo "SonarQube task status: ${status}"
-
-                                if (status == 'SUCCESS') {
-
-                                    analysisId = sh(
-                                        script: """
-                                            curl -fsS \
-                                              -u "\\$SONAR_TOKEN:" \
-                                              "http://172.31.23.180:9000/api/ce/task?id=${ceTaskId}" |
-                                            node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).task.analysisId"
-                                        """,
-                                        returnStdout: true
-                                    ).trim()
-
-                                    break
-                                }
-
-                                if (status == 'FAILED' || status == 'CANCELED') {
-                                    error "SonarQube Compute Engine task ${status}"
-                                }
-
-                                sleep 5
-                            }
-
-                            def gateStatus = sh(
-                                script: """
-                                    curl -fsS \
-                                      -u "\\$SONAR_TOKEN:" \
-                                      "http://172.31.23.180:9000/api/qualitygates/project_status?analysisId=${analysisId}" |
-                                    node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).projectStatus.status"
-                                """,
-                                returnStdout: true
-                            ).trim()
-
-                            echo "SonarQube Quality Gate: ${gateStatus}"
-
-                            if (gateStatus != 'OK') {
-                                error "SonarQube Quality Gate failed: ${gateStatus}"
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
         stage('Push Feature Artifact to Nexus') {
             when {
                 expression {
