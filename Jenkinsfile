@@ -17,9 +17,7 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                sh '''
-                    npm ci
-                '''
+                sh 'npm ci'
             }
         }
 
@@ -31,41 +29,40 @@ pipeline {
                     VERSION=$(node -p "require('./package.json').version")
 
                     if [ "$BRANCH_NAME" = "main" ]; then
-                        ARTIFACT_VERSION="${VERSION}-release.${BUILD_NUMBER}"
+                       ARTIFACT_VERSION="${VERSION}-release.${BUILD_NUMBER}"
                     else
-                        ARTIFACT_VERSION="${VERSION}-feature.${BUILD_NUMBER}"
+                       ARTIFACT_VERSION="${VERSION}-feature.${BUILD_NUMBER}"
                     fi
 
                     echo "Artifact version: $ARTIFACT_VERSION"
 
+                    npm version "$ARTIFACT_VERSION" --no-git-tag-version
+
                     npm pack
-
-                    mv "nodejs-cicd-demo-${VERSION}.tgz" \
-                       "nodejs-cicd-demo-${ARTIFACT_VERSION}.tgz"
-
-                    ls -lh nodejs-cicd-demo-*.tgz
                 '''
             }
         }
 
         stage('Test') {
             steps {
-                sh '''
-                    npm test
-                '''
+                sh 'npm test'
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('SonarQube') {
-                    sh '''
-                        sonar-scanner \
-                          -Dsonar.projectKey=nodejs-cicd-demo \
-                          -Dsonar.sources=app.js \
-                          -Dsonar.tests=test \
-                          -Dsonar.test.inclusions=test/**/*.js
-                    '''
+                script {
+                    def scannerHome = tool 'SonarScanner'
+
+                    withSonarQubeEnv('SonarQube') {
+                        sh """
+                            ${scannerHome}/bin/sonar-scanner \
+                              -Dsonar.projectKey=nodejs-cicd-demo \
+                              -Dsonar.sources=app.js \
+                              -Dsonar.tests=test \
+                              -Dsonar.test.inclusions=test/**/*.js
+                        """
+                    }
                 }
             }
         }
@@ -73,39 +70,33 @@ pipeline {
         stage('SonarQube Quality Gate') {
             steps {
                 script {
-                    def ceTaskId = sh(
-                        script: "grep '^ceTaskId=' .scannerwork/report-task.txt | cut -d= -f2",
-                        returnStdout: true
-                    ).trim()
-
-                    echo "SonarQube CE Task ID: ${ceTaskId}"
-
                     withCredentials([
                         string(
                             credentialsId: 'sonarqube-token',
                             variable: 'SONAR_TOKEN'
                         )
                     ]) {
-
-                        def analysisId = ''
-
                         timeout(time: 5, unit: 'MINUTES') {
-                            waitUntil {
-                                def response = sh(
-                                    script: """
-                                        curl -s \
-                                          -u "\$SONAR_TOKEN:" \
-                                          "http://172.31.23.180:9000/api/ce/task?id=${ceTaskId}"
-                                    """,
-                                    returnStdout: true
-                                ).trim()
 
-                                echo "SonarQube CE response: ${response}"
+                            def ceTaskId = sh(
+                                script: '''
+                                    awk -F= '/^ceTaskId=/{print $2}' .scannerwork/report-task.txt
+                                ''',
+                                returnStdout: true
+                            ).trim()
+
+                            echo "SonarQube CE task: ${ceTaskId}"
+
+                            def analysisId = ''
+
+                            while (true) {
 
                                 def status = sh(
                                     script: """
-                                        echo '${response}' | \
-                                        python3 -c "import sys,json; print(json.load(sys.stdin)['task']['status'])"
+                                        curl -fsS \
+                                          -u "\$SONAR_TOKEN:" \
+                                          "http://172.31.23.180:9000/api/ce/task?id=${ceTaskId}" |
+                                        node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).task.status"
                                     """,
                                     returnStdout: true
                                 ).trim()
@@ -113,61 +104,52 @@ pipeline {
                                 echo "SonarQube task status: ${status}"
 
                                 if (status == 'SUCCESS') {
+
                                     analysisId = sh(
                                         script: """
-                                            echo '${response}' | \
-                                            python3 -c "import sys,json; print(json.load(sys.stdin)['task']['analysisId'])"
+                                            curl -fsS \
+                                              -u "\$SONAR_TOKEN:" \
+                                              "http://172.31.23.180:9000/api/ce/task?id=${ceTaskId}" |
+                                            node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).task.analysisId"
                                         """,
                                         returnStdout: true
                                     ).trim()
 
-                                    return true
+                                    break
                                 }
 
-                                if (status in ['FAILED', 'CANCELED']) {
-                                    error("SonarQube analysis failed with status: ${status}")
+                                if (status == 'FAILED' || status == 'CANCELED') {
+                                    error "SonarQube Compute Engine task ${status}"
                                 }
 
                                 sleep 5
-                                return false
                             }
-                        }
 
-                        echo "SonarQube Analysis ID: ${analysisId}"
+                            def gateStatus = sh(
+                                script: """
+                                    curl -fsS \
+                                      -u "\$SONAR_TOKEN:" \
+                                      "http://172.31.23.180:9000/api/qualitygates/project_status?analysisId=${analysisId}" |
+                                    node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).projectStatus.status"
+                                """,
+                                returnStdout: true
+                            ).trim()
 
-                        def qualityGate = sh(
-                            script: """
-                                curl -s \
-                                  -u "\$SONAR_TOKEN:" \
-                                  "http://172.31.23.180:9000/api/qualitygates/project_status?analysisId=${analysisId}"
-                            """,
-                            returnStdout: true
-                        ).trim()
+                            echo "SonarQube Quality Gate: ${gateStatus}"
 
-                        echo "SonarQube Quality Gate response: ${qualityGate}"
-
-                        def gateStatus = sh(
-                            script: """
-                                echo '${qualityGate}' | \
-                                python3 -c "import sys,json; print(json.load(sys.stdin)['projectStatus']['status'])"
-                            """,
-                            returnStdout: true
-                        ).trim()
-
-                        echo "SonarQube Quality Gate status: ${gateStatus}"
-
-                        if (gateStatus != 'OK') {
-                            error("SonarQube Quality Gate failed: ${gateStatus}")
+                            if (gateStatus != 'OK') {
+                                error "SonarQube Quality Gate failed: ${gateStatus}"
+                            }
                         }
                     }
                 }
             }
         }
 
-        stage('Push Artifact to Nexus') {
+        stage('Push Feature Artifact to Nexus') {
             when {
-                not {
-                    branch 'main'
+                expression {
+                    env.BRANCH_NAME.startsWith('feature/')
                 }
             }
 
@@ -188,11 +170,7 @@ pipeline {
                         )
                     ]) {
                         sh """
-                            curl --noproxy '*' \
-                              --fail \
-                              --show-error \
-                              --connect-timeout 10 \
-                              --max-time 120 \
+                            curl -f \
                               -u "\$NEXUS_USER:\$NEXUS_PASSWORD" \
                               --upload-file "${artifact}" \
                               "http://172.31.16.167:8081/repository/raw-release/${artifact}"
@@ -224,11 +202,7 @@ pipeline {
                         )
                     ]) {
                         sh """
-                            curl --noproxy '*' \
-                              --fail \
-                              --show-error \
-                              --connect-timeout 10 \
-                              --max-time 120 \
+                            curl -f \
                               -u "\$NEXUS_USER:\$NEXUS_PASSWORD" \
                               --upload-file "${artifact}" \
                               "http://172.31.16.167:8081/repository/raw-release/${artifact}"
