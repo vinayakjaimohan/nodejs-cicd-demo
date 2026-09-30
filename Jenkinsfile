@@ -29,9 +29,9 @@ pipeline {
                     VERSION=$(node -p "require('./package.json').version")
 
                     if [ "$BRANCH_NAME" = "main" ]; then
-                       ARTIFACT_VERSION="${VERSION}-release.${BUILD_NUMBER}"
+                        ARTIFACT_VERSION="$VERSION"
                     else
-                       ARTIFACT_VERSION="${VERSION}-feature.${BUILD_NUMBER}"
+                        ARTIFACT_VERSION="${VERSION}-feature.${BUILD_NUMBER}"
                     fi
 
                     echo "Artifact version: $ARTIFACT_VERSION"
@@ -209,6 +209,41 @@ pipeline {
                         """
                     }
                 }
+            }
+        }
+
+        stage('Deploy to EC2') {
+            when {
+                branch 'main'
+            }
+
+            steps {
+                script {
+                    def artifact = sh(
+                        script: 'ls -t nodejs-cicd-demo-*.tgz | head -n 1',
+                        returnStdout: true
+                    ).trim()
+
+                    echo "Deploying artifact: ${artifact}"
+
+                    sh """
+                        cp "${artifact}" "\$HOME/nodejs-app/"
+                        "\$HOME/deploy-app.sh" "\$HOME/nodejs-app/${artifact}"
+                    """
+                }
+            }
+        }
+
+        stage('Smoke Test') {
+            when {
+                branch 'main'
+            }
+
+            steps {
+                sh '''
+                    sleep 3
+                    curl -f http://localhost:3000/health
+                '''
             }
         }
     }
